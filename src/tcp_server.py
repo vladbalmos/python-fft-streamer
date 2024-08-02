@@ -46,11 +46,11 @@ async def broadcast_fft_data():
                     for client in disconnected_clients:
                         _clients.remove(client)
                         
-                # for client in _clients:
-                    # try:
-                        # await asyncio.wait_for(client.read(1), timeout=0.001)
-                    # except:
-                        # pass
+                for client in _clients:
+                    try:
+                        await asyncio.wait_for(client.read(1), timeout=0.001)
+                    except:
+                        pass
                 continue
             else:
                 await asyncio.sleep(0.001)
