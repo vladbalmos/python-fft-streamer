@@ -65,11 +65,12 @@ When a client connects it will first receive a two byte configuration message wh
 
 Configuration message (16 bit) |  Sample rate | Frequencies count |
 -------------------------------|--------------|-------------------|
-            0x140xa            |     20       |       10          |
+0x140xa            |     20       |       10          |
 
-After the config message the client will receive the amplitudes in dBFS encoded as a 32 bit float bytearray having a length defined by the frequency band count received in the configuration message. The frequency of each amplitudes set is defined by the sample rate value from the first configuration message. Ex:
+After the config message the client will receive the amplitudes in dBFS encoded as a 32 bit float bytearray having a length defined by the frequency band count received in the configuration message. The frequency of each amplitudes set is defined by the sample rate value from the first configuration message.
 
-    Given a sample rate of 20 samples/s and a frequency count of 10, a client will receive 40 bytes of data every 50ms. Each amplitude value corresponds to one of the frequency band defined in `src/fft.py`. After each set of amplitudes the client must respond back with 1 byte of arbitrary data.
+Ex:   
+Given a sample rate of 20 samples/s and a frequency count of 10, a client will receive 40 bytes of data every 50ms. Each amplitude value corresponds to one of the frequency band defined in `src/fft.py`. After each set of amplitudes the client must respond back with 1 byte of arbitrary data.
     
 See the `fft_client.py` as an example implementation.
         
