@@ -11,7 +11,7 @@ _asyncio_loop = None
 _thread = None
 _server = None
 _clients = []
-_framerate = None
+_sample_rate = None
 _frequency_bands_count = None
 
 async def broadcast_fft_data():
@@ -60,7 +60,8 @@ async def broadcast_fft_data():
             await client.wait_closed()
 
 async def handle_client(_, writer):
-    writer.write(struct.pack('!bb', _framerate, _frequency_bands_count))
+    print(_sample_rate, _frequency_bands_count)
+    writer.write(struct.pack('!bb', _sample_rate, _frequency_bands_count))
     await writer.drain()
     print("Client connected")
     _clients.append(writer)
@@ -83,9 +84,9 @@ async def main(host, port):
         await asyncio.sleep(1)
 
 
-def run(asyncio_loop, framerate, frequency_bands_count, host, port):
-    global _framerate, _frequency_bands_count
-    _framerate = framerate
+def run(asyncio_loop, sample_rate, frequency_bands_count, host, port):
+    global _sample_rate, _frequency_bands_count
+    _sample_rate = sample_rate
     _frequency_bands_count = frequency_bands_count
 
     asyncio.set_event_loop(asyncio_loop)

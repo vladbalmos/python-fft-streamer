@@ -124,7 +124,7 @@ if __name__ == '__main__':
 Analyze audio and stream FFT results over TCP while displaying an animation on the screen.
 Provide either --input-id or --file to specify the audio source. If both are provided --file will be used.
 ''')
-    parser.add_argument('--sample-rate', default=20, type=int, help='FFT sampling rate. Defaults to 20 (FFT analysis every 20ms)')
+    parser.add_argument('--sample-rate', default=20, type=int, help='FFT sampling rate. Defaults to 20 samples/s (FFT analysis every 50ms)')
     parser.add_argument('--host', default='0.0.0.0', type=str, help='The host to bind the TCP server. Defaults to "0.0.0.0"')
     parser.add_argument('--port', default=12345, type=int, help='The port to bind the TCP server. Defaults to 12345')
     parser.add_argument('--file', type=str, help='Path to the audio wav file')
@@ -138,7 +138,7 @@ Provide either --input-id or --file to specify the audio source. If both are pro
     
     if len(sys.argv) == 1:
         parser.print_help()
-        exit(1)
+        exit(0)
         
     args = parser.parse_args()
     
