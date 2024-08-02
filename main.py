@@ -25,7 +25,7 @@ last_levels = None
 
 
 def audio_worker():
-    fft.init(fft_queue)
+    fft.init(fft_queue, not args.disable_emma, args.emma_alpha)
 
     source = None
     source_type = None
@@ -130,9 +130,11 @@ Provide either --input-id or --file to specify the audio source. If both are pro
     parser.add_argument('--file', type=str, help='Path to the audio wav file')
     parser.add_argument('--input-id', type=str, help='The id of the input device to capture. Use --list-inputs to list all available input devices')
     parser.add_argument('--list-inputs', action='store_true', help='List all available input devices')
+    parser.add_argument('--fps', type=int, default=60, help="Animation framerate in frames per second. Defaults to 60")
+    parser.add_argument('--emma-alpha', type=float, default=0.5, help="The alpha value for the exponential moving average. Defaults to 0.5")
     parser.add_argument('--disable-server', action='store_true', help="Disable streaming FFT results over TCP. By default, the server is enabled")
     parser.add_argument('--disable-animation', action='store_true', help="Disable the built-in animation, run only the TCP server")
-    parser.add_argument('--animation-fps', type=int, default=60, help="Animation framerate in frames per second. Defaults to 60")
+    parser.add_argument('--disable-emma', action='store_true', help="Disable the exponential moving average for the FFT results")
     
     if len(sys.argv) == 1:
         parser.print_help()
@@ -151,11 +153,11 @@ Provide either --input-id or --file to specify the audio source. If both are pro
     if args.sample_rate < 1:
         parser.error("Sample rate must be greater than 0")
         
-    if args.animation_fps < args.sample_rate:
+    if args.fps < args.sample_rate:
         parser.error("Animation framerate must be greater than or equal to the FFT sampling rate")
 
     FFT_SAMPLING_RATE = args.sample_rate
-    ANIMATION_FRAMERATE = args.animation_fps
+    ANIMATION_FRAMERATE = args.fps
 
     print(f'FFT sampling rate (rate/s): {FFT_SAMPLING_RATE}')
     if not args.disable_animation:

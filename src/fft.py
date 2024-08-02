@@ -7,6 +7,7 @@ _EPSILON = 1e-10
 _STARTING_EMMA = -60
 
 _fft_queue = None
+_emma_enabled = False
 
 frequency_bands = [
     (1, 32, [], [_STARTING_EMMA], _DEFAULT_ALPHA + 0.10),
@@ -20,20 +21,6 @@ frequency_bands = [
     (4001, 8000, [], [_STARTING_EMMA], _DEFAULT_ALPHA + 0.1),
     (8001, 16000, [], [_STARTING_EMMA], _DEFAULT_ALPHA + 0.1)
 ]
-
-# frequency_bands = [
-#     (1, 32, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (32, 62, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (63, 125, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (126, 250, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (251, 500, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (501, 1000, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (1001, 2000, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (2001, 4000, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (4001, 8000, [], [_STARTING_EMMA], _DEFAULT_ALPHA),
-#     (8001, 16000, [], [_STARTING_EMMA], _DEFAULT_ALPHA)
-# ]
-
 
 def analyze(audio_frames, slice_size, audio_framerate, sample_width, channels):
     global global_max
@@ -85,15 +72,20 @@ def analyze(audio_frames, slice_size, audio_framerate, sample_width, channels):
 
             loudness_db = 20 * np.log10((amplitudes + _EPSILON) / (max_amplitude + _EPSILON))
             max_loudness = np.max(loudness_db)
-            # bin_maxima[i] = max_loudness
-            ema[0] = (max_loudness * alpha) + (ema[0] * (1 - alpha))
-            bin_maxima[i] = ema[0]
             
-        # print(bin_maxima)
+            if _emma_enabled:
+                ema[0] = (max_loudness * alpha) + (ema[0] * (1 - alpha))
+                bin_maxima[i] = ema[0]
+            else:
+                bin_maxima[i] = max_loudness
+            
         _fft_queue.put(bin_maxima)
         start = end
         end += slice_size
 
-def init(fft_queue):
-    global _fft_queue
+def init(fft_queue, enable_emma, emma_alpha):
+    global _fft_queue, _emma_enabled, _DEFAULT_ALPHA
     _fft_queue = fft_queue
+    _emma_enabled = enable_emma
+    _DEFAULT_ALPHA = emma_alpha
+    print(_emma_enabled, _DEFAULT_ALPHA)
