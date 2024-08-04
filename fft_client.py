@@ -97,6 +97,7 @@ async def main(args):
     last_output_ms = 0
     
     receive_periods = []
+    received_samples = 0
 
     # Start receiving samples
     while True:
@@ -106,12 +107,13 @@ async def main(args):
             receive_periods.append(client.last_sample_time_ms)
 
         if ((time.time() - last_output_ms) * 1000) >= 1000 and len(receive_periods):
-            print(f"Average receive period: {sum(receive_periods) / len(receive_periods):.2f}ms")
+            print(f"Average receive period: {sum(receive_periods) / len(receive_periods):.2f}ms. Received samples: {received_samples}")
             receive_periods = []
             last_output_ms = now
 
         # Read the data from server
         amplitudes = await client.read_fft_data()
+        received_samples += 1
         
         # Do something with the amplitudes
         # print(amplitudes)

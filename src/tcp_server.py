@@ -14,63 +14,107 @@ _clients = []
 _sample_rate = None
 _frequency_bands_count = None
 
+async def disconnect_clients(clients):
+    for client in clients:
+        try:
+            client[1].close()
+            await asyncio.wait_for(client[1].wait_closed(), timeout=0.005)
+        except:
+            pass
+        _clients.remove(client)
+        
+async def discard_client_responses():
+    '''We don't care about client responses. The only reason for expecting them
+    is to make sure the client doesn't delay sending the ACK packet after receiving data
+    which in turn would delay the next FFT data packet'''
+    while True:
+        for client in _clients:
+            try:
+                now = time.time()
+                await asyncio.wait_for(client[0].readexactly(1), timeout=0.01)
+                read_duration_ms = (time.time() - now) * 1000
+                if read_duration_ms > 1:
+                    print('Client response read duration:', read_duration_ms)
+            except asyncio.TimeoutError:
+                print("Caught timeout error while waiting for client response")
+            except Exception as e:
+                print("Client disconnected", e)
+                await disconnect_clients([client])
+        await asyncio.sleep(1)
+
 async def broadcast_fft_data():
     try:
-        last_ms = time.time()
+        last_ms = 0
         last_output_ms = time.time()
+        sent_samples = 0
         while True:
             try:
                 data = data_queue.get(block=True, timeout=0.001)
             except queue.Empty:
                 data = None
+                
+            if data is None:
+                await asyncio.sleep(0.001)
+                continue
 
-            if data is not None:
-                data = struct.pack(f'!{len(data)}f', *data.tolist())
-                disconnected_clients = []
-                for client in _clients:
-                    try:
-                        client.write(data)
-                        await client.drain()
-                        now = time.time()
-                        diff = now - last_ms
+            if len(_clients) > 0:
+                sent_samples += 1
+
+            data = struct.pack(f'!{len(data)}f', *data.tolist())
+            disconnected_clients = []
+
+            for client in _clients:
+                try:
+                    client[1].write(data)
+                    await client[1].drain()
+
+                    now = time.time()
+                    if last_ms > 0:
+                        diff = (now - last_ms) * 1000
                         
                         if time.time() - last_output_ms >= 1:
-                            print(diff * 1000)
+                            print(f'Sending interval: {diff}ms. Sent FFT results: {sent_samples}')
                             last_output_ms = now
-                        last_ms = now
-                    except Exception as e:
-                        disconnected_clients.append(client)
-                        print("Client disconnected", e)
-                        
-                if len(disconnected_clients):
-                    for client in disconnected_clients:
-                        _clients.remove(client)
-                        
-                for client in _clients:
-                    try:
-                        await asyncio.wait_for(client.read(1), timeout=0.001)
-                    except:
-                        pass
-                continue
-            else:
-                await asyncio.sleep(0.001)
-    except asyncio.CancelledError:
-        for client in _clients:
-            client.close()
-            await client.wait_closed()
 
-async def handle_client(_, writer):
+                    last_ms = now
+                except asyncio.TimeoutError as e:
+                    print("Timeout error", e)
+                    continue
+                except Exception as e:
+                    disconnected_clients.append(client)
+                    print("Client disconnected", e)
+                    
+            # remove any disconnected clients
+            if len(disconnected_clients):
+                await disconnect_clients(disconnected_clients)
+
+    except asyncio.CancelledError:
+        await disconnect_clients(_clients)
+
+async def handle_client(reader, writer):
     print(_sample_rate, _frequency_bands_count)
-    writer.write(struct.pack('!bb', _sample_rate, _frequency_bands_count))
-    await writer.drain()
+    try:
+        writer.write(struct.pack('!bb', _sample_rate, _frequency_bands_count))
+        await writer.drain()
+    except:
+        print("Error while sending config to client")
+        return
+
+    try:
+        await asyncio.wait_for(reader.readexactly(1), timeout=1)
+    except asyncio.TimeoutError:
+        print("Timeout while waiting for client response after connection")
+        return
+
     print("Client connected")
-    _clients.append(writer)
+    _clients.append([reader, writer])
 
 async def main(host, port):
     global _server
     _server = await asyncio.start_server(handle_client, host, port)
     broadcast_task = asyncio.create_task(broadcast_fft_data())
-    tasks = asyncio.gather(broadcast_task, _server.serve_forever())
+    discard_client_responses_task = asyncio.create_task(discard_client_responses())
+    tasks = asyncio.gather(broadcast_task, discard_client_responses_task, _server.serve_forever())
     while True:
         if stop_event.is_set():
             tasks.cancel()
