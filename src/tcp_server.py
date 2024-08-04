@@ -1,3 +1,4 @@
+import sys
 import time
 import threading
 import asyncio
@@ -17,36 +18,44 @@ _frequency_bands_count = None
 async def disconnect_clients(clients):
     for client in clients:
         try:
+            if client[1].is_closing():
+                continue
+               
             client[1].close()
-            await asyncio.wait_for(client[1].wait_closed(), timeout=0.005)
+            await asyncio.wait_for(client[1].wait_closed(), timeout=1)
         except:
             pass
-        _clients.remove(client)
+        finally:
+            _clients.remove(client)
         
 async def discard_client_responses():
     '''We don't care about client responses. The only reason for expecting them
     is to make sure the client doesn't delay sending the ACK packet after receiving data
     which in turn would delay the next FFT data packet'''
-    while True:
-        for client in _clients:
-            try:
-                now = time.time()
-                await asyncio.wait_for(client[0].readexactly(1), timeout=0.01)
-                read_duration_ms = (time.time() - now) * 1000
-                if read_duration_ms > 1:
-                    print('Client response read duration:', read_duration_ms)
-            except asyncio.TimeoutError:
-                print("Caught timeout error while waiting for client response")
-            except Exception as e:
-                print("Client disconnected", e)
-                await disconnect_clients([client])
-        await asyncio.sleep(1)
+    
+    try:
+        while True:
+            for client in _clients:
+                try:
+                    now = time.time()
+                    await asyncio.wait_for(client[0].readexactly(1), timeout=0.05)
+                    read_duration_ms = (time.time() - now) * 1000
+                    if read_duration_ms > 1:
+                        print('Client response read duration:', read_duration_ms)
+                except asyncio.TimeoutError:
+                    print("Caught timeout error while waiting for client response")
+                except Exception as e:
+                    print("Client disconnected", e)
+                    await disconnect_clients([client])
+            await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        pass
 
 async def broadcast_fft_data():
     try:
         last_ms = 0
-        last_output_ms = time.time()
-        sent_samples = 0
+        period = 1000 / _sample_rate
+        skip_threshold = period + (period * 0.25)
         while True:
             try:
                 data = data_queue.get(block=True, timeout=0.001)
@@ -57,26 +66,21 @@ async def broadcast_fft_data():
                 await asyncio.sleep(0.001)
                 continue
 
-            if len(_clients) > 0:
-                sent_samples += 1
-
             data = struct.pack(f'!{len(data)}f', *data.tolist())
             disconnected_clients = []
 
             for client in _clients:
                 try:
+                    now = time.time()
+                    diff = round((now - last_ms) * 1000)
+                    last_ms = now
+                    
+                    if diff > skip_threshold:
+                        print(f"Skipping frame. Expected interval: {skip_threshold}ms. Actual: {diff}")    
+                        continue
+
                     client[1].write(data)
                     await client[1].drain()
-
-                    now = time.time()
-                    if last_ms > 0:
-                        diff = (now - last_ms) * 1000
-                        
-                        if time.time() - last_output_ms >= 1:
-                            print(f'Sending interval: {diff}ms. Sent FFT results: {sent_samples}')
-                            last_output_ms = now
-
-                    last_ms = now
                 except asyncio.TimeoutError as e:
                     print("Timeout error", e)
                     continue
@@ -114,20 +118,28 @@ async def main(host, port):
     _server = await asyncio.start_server(handle_client, host, port)
     broadcast_task = asyncio.create_task(broadcast_fft_data())
     discard_client_responses_task = asyncio.create_task(discard_client_responses())
-    tasks = asyncio.gather(broadcast_task, discard_client_responses_task, _server.serve_forever())
+    tasks = asyncio.gather(broadcast_task, discard_client_responses_task)
     while True:
         if stop_event.is_set():
+            print("Canceling all tasks")
             tasks.cancel()
             try:
+                print("Waiting for tasks to finish")
                 await tasks
             except asyncio.CancelledError:
                 pass
-            await _server.wait_closed()
+            
+            print("Waiting for server to close")
+            _server.close()
+            try:
+                await asyncio.wait_for(_server.wait_closed(), timeout=5)
+            except:
+                pass
+
             asyncio.get_event_loop().stop()
             break
         await asyncio.sleep(1)
-
-
+        
 def run(asyncio_loop, sample_rate, frequency_bands_count, host, port):
     global _sample_rate, _frequency_bands_count
     _sample_rate = sample_rate
@@ -152,6 +164,8 @@ def join():
     _thread.join()
 
 def stop():
+    print("Stopping server")
     stop_event.set()
-    _thread.join()
+    print("Waiting for thread to finish")
+    _thread.join(10.0)
     
