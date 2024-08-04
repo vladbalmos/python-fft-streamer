@@ -7,6 +7,7 @@ import struct
 
 data_queue = queue.Queue()
 stop_event = threading.Event()
+ready_event = threading.Event()
 
 _asyncio_loop = None
 _thread = None
@@ -119,6 +120,8 @@ async def main(host, port):
     broadcast_task = asyncio.create_task(broadcast_fft_data())
     discard_client_responses_task = asyncio.create_task(discard_client_responses())
     tasks = asyncio.gather(broadcast_task, discard_client_responses_task)
+    
+    ready_event.set()
     while True:
         if stop_event.is_set():
             print("Canceling all tasks")

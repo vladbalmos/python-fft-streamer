@@ -88,4 +88,3 @@ def init(fft_queue, enable_emma, emma_alpha):
     _fft_queue = fft_queue
     _emma_enabled = enable_emma
     _DEFAULT_ALPHA = emma_alpha
-    print(_emma_enabled, _DEFAULT_ALPHA)
