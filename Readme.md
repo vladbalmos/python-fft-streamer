@@ -10,6 +10,16 @@ The server feature can be used to make custom IoT RGB lights react to sound / mu
 - Stream FFT analysis results over TCP to multiple clients
 - Real-time demo animation that responds to audio data
 
+### Demo
+
+This demo showcases this project and two related ones
+* A Raspberry Pi Pico based RGB Lamp that reacts to the FFT analysis [pico-rgb-lamp](https://github.com/vladbalmos/pico-rgb-lamp)
+* A basic home automation solution based on MQTT [pihub](https://github.com/vladbalmos/pihub)
+
+[![Demo](https://img.youtube.com/vi/2PfCFWdMnYo/0.jpg)](https://www.youtube.com/watch?v=2PfCFWdMnYo)
+
+[View on YouTube](https://www.youtube.com/watch?v=2PfCFWdMnYo)
+
 ## Dependencies
 
 - `pygame`
